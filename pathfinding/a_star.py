@@ -36,8 +36,26 @@ class AStar(PathFinder):
     def __init__(self, grid:Grid) -> None:
         super().__init__(grid)
 
-    def search(self, start: Node, end: Node) -> list[Node]:
-        """Finds a path between ``start`` and ``end`` if one exists using the A* pathfinding algorithim
+    def search(self, start: Node, end: Node, lazy=True) -> list[Node]:
+        """Uses the A* pathfinding algorithim. Finds a path between ``start`` and ``end`` if one exists.
+
+        Args:
+            start (Node): ``Node`` to start from
+            end (Node): ``Node`` to find path to
+            lazy (bool, optional): Whether to use the lazy implementation of A*. Defaults to True.
+
+        Raises:
+            NoSolution: Raised if no path exists between ``start`` and ``end``
+
+        Returns:
+            list[Node]: A list of ``Nodes`` traversed to get from ``start`` to ``end``
+        """
+        if lazy:
+            return self.search_lazy(start, end)
+        return self.search_thorough(start, end)
+
+    def search_lazy(self, start:Node, end:Node) -> list[Node]:
+        """Lazy Implementation. Finds a path between ``start`` and ``end`` if one exists using the A* pathfinding algorithim
 
         Args:
             start (Node): ``Node`` to start from
@@ -92,3 +110,66 @@ class AStar(PathFinder):
         # If we went through every node in open_nodes and we didnt get to the end node
         # That means that no path between the two nodes exist
         raise NoSolution("No Path exists")
+
+    def search_thorough(self, start:Node, end:Node) -> list[Node]:
+        """Finds a path between ``start`` and ``end`` if one exists using the A* pathfinding algorithim
+
+        Args:
+            start (Node): ``Node`` to start from
+            end (Node): ``Node`` to find path to
+
+        Raises:
+            NoSolution: Raised if no path exists between ``start`` and ``end``
+
+        Returns:
+            list[Node]: A list of ``Nodes`` traversed to get from ``start`` to ``end``
+        """
+        open_nodes = [AStarNode.from_node(start)]
+        closed_nodes:list[AStarNode] = []
+        paths = []
+        end = AStarNode.from_node(end)
+        while open_nodes:
+            current_node = open_nodes[0]
+            current_index = 0
+
+
+            for index, item in enumerate(open_nodes):
+                if item.f < current_node.f:
+                    current_node = item
+                    current_index = index
+
+            open_nodes.pop(current_index)
+            closed_nodes.append(current_node)
+            
+            # Check to see if the goal is reached
+            if current_node == end:
+                paths.append(current_node.path())
+
+            children:list[AStarNode] = []
+            for adjacent_node in self.grid.adjacent(current_node):
+                adjacent_node = AStarNode.from_node(adjacent_node, current_node)
+                if adjacent_node.wall:
+                    continue
+                children.append(adjacent_node)
+            
+            for child in children:
+                if child in closed_nodes:
+                    continue
+
+                child.g = current_node.g + 1
+                child.h = child.distance(end)
+                child.f = child.g + child.h
+
+                for open_node in open_nodes:
+                    if child == open_node and child.g > open_node.g:
+                        continue
+
+                open_nodes.append(child)
+        # If we went through every node in open_nodes and we didnt get to the end node
+        # And the list of paths is empty
+        # That means that no path between the two nodes exist
+        if not paths:
+            raise NoSolution("No Path exists")
+        
+        # Otherwise we return the shortest path in the list
+        return min(paths, key=lambda x: len(x))
